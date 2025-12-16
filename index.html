@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>3D FPS HTML5</title>
+<style>
+body{margin:0;overflow:hidden;background:#000;}
+#hud{
+  position:fixed;top:10px;left:10px;
+  color:white;font:20px Arial;
+  z-index:2;
+}
+#cross{
+  position:fixed;top:50%;left:50%;
+  width:20px;height:20px;
+  margin:-10px;border:2px solid white;
+  z-index:2;
+}
+#gameover{
+  display:none;position:fixed;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  color:white;font:30px Arial;
+  z-index:2;
+}
+#joystick{
+  position:fixed;bottom:30px;left:30px;
+  width:100px;height:100px;
+  background:rgba(255,255,255,0.2);
+  border-radius:50%;
+  touch-action:none;
+  z-index:2;
+}
+#stick{
+  width:50px;height:50px;
+  background:rgba(255,255,255,0.6);
+  border-radius:50%;
+  position:absolute;
+  left:25px;top:25px;
+}
+</style>
+</head>
+<body>
+
+<div id="hud">❤️ 100 | 👾 0 | 🔫 Пистолет</div>
+<div id="cross"></div>
+<div id="gameover">GAME OVER<br>Обнови страницу</div>
+<div id="joystick"><div id="stick"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+
+<script>
+// ================== СЦЕНА ==================
+let scene=new THREE.Scene();
+scene.background=new THREE.Color(0x202020);
+let camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,1000);
+let renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Свет
+scene.add(new THREE.AmbientLight(0x555555));
+let sun=new THREE.DirectionalLight(0xffffff,1);
+sun.position.set(5,10,5);
+scene.add(sun);
+
+// Пол
+let floor=new THREE.Mesh(
+  new THREE.BoxGeometry(100,1,100),
+  new THREE.MeshStandardMaterial({color:0x333333})
+);
+floor.position.y=-1;
+scene.add(floor);
+
+// ================== ИГРОК ==================
+camera.position.set(0,2,5);
+let hp=100, score=0;
+let weapon="pistol";
+
+// ================== HUD ==================
+let hud=document.getElementById("hud");
+function updateHUD(){hud.innerHTML=`❤️ ${hp} | 👾 ${score} | 🔫 ${weapon}`;}
+
+// ================== УПРАВЛЕНИЕ ==================
+let keys={}, yaw=0;
+document.addEventListener("keydown",e=>keys[e.code]=true);
+document.addEventListener("keyup",e=>keys[e.code]=false);
+document.addEventListener("mousemove",e=>yaw-=e.movementX*0.002);
+
+// ================== ВРАГИ ==================
+let enemies=[];
+function spawnEnemy(){
+  let e=new THREE.Mesh(
+    new THREE.BoxGeometry(1,2,1),
+    new THREE.MeshStandardMaterial({color:0xff0000})
+  );
+  e.position.set(Math.random()*20-10,1,Math.random()*-30);
+  scene.add(e);
+  enemies.push(e);
+}
+for(let i=0;i<6;i++) spawnEnemy();
+
+// ================== ОРУЖИЕ ==================
+function shoot(){
+  let ray=new THREE.Raycaster();
+  ray.setFromCamera(new THREE.Vector2(0,0),camera);
+  let hit=ray.intersectObjects(enemies);
+  if(hit.length){
+    let obj=hit[0].object;
+    scene.remove(obj);
+    enemies.splice(enemies.indexOf(obj),1);
+    score++;
+    spawnEnemy();
+    updateHUD();
+    // звук попадания
+    let audio=new Audio("https://freesound.org/data/previews/320/320181_5260876-lq.mp3");
+    audio.volume=0.2; audio.play();
+  }
+}
+document.addEventListener("click",shoot);
+document.addEventListener("touchstart",shoot);
+
+// ================== ДЖОЙСТИК ==================
+let stick=document.getElementById("stick");
+let joystick=document.getElementById("joystick");
+let joyX=0, joyY=0, maxRadius=40;
+
+let dragging=false;
+stick.addEventListener("touchstart",e=>{dragging=true;});
+stick.addEventListener("touchend",e=>{dragging=false; stick.style.left="25px"; stick.style.top="25px"; joyX=0; joyY=0;});
+stick.addEventListener("touchmove",e=>{
+  if(!dragging) return;
+  let touch=e.touches[0];
+  let rect=joystick.getBoundingClientRect();
+  let x=touch.clientX-rect.left-50;
+  let y=touch.clientY-rect.top-50;
+  let r=Math.sqrt(x*x+y*y);
+  if(r>maxRadius){x=x/r*maxRadius; y=y/r*maxRadius;}
+  joyX=x/40; joyY=y/40;
+  stick.style.left=(25+x)+"px"; stick.style.top=(25+y)+"px";
+});
+
+// ================== ЦИКЛ ==================
+function animate(){
+  requestAnimationFrame(animate);
+  camera.rotation.y=yaw;
+
+  // движение ПК
+  let s=0.15;
+  if(keys.KeyW) camera.translateZ(-s);
+  if(keys.KeyS) camera.translateZ(s);
+  if(keys.KeyA) camera.translateX(-s);
+  if(keys.KeyD) camera.translateX(s);
+  // движение моб
+  camera.translateX(joyX*s);
+  camera.translateZ(-joyY*s);
+
+  // враги
+  enemies.forEach(e=>{
+    e.lookAt(camera.position);
+    e.translateZ(0.05);
+    if(e.
